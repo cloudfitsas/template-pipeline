@@ -2,13 +2,13 @@ name: CI/CD Pipeline Template
 
 on:
   workflow_call:
-    secrets:
-      aws-access-key-id:
-        description: 'AWS Access Key ID'
-        required: true
-      aws-secret-access-key:
-        description: 'AWS Secret Access Key'
-        required: true
+    # secrets:
+    #   aws-access-key-id:
+    #     description: 'AWS Access Key ID'
+    #     required: true
+    #   aws-secret-access-key:
+    #     description: 'AWS Secret Access Key'
+    #     required: true
     inputs:
       aws-region:
         description: 'AWS Region'
