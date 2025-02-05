@@ -20,25 +20,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
+      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '22'
 
+      # Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # Build the project
       - name: Build project
         run: npm run build
 
+      # Run tests and generate coverage report
       - name: Run tests and generate coverage
         run: npm run test -- --coverage
 
+      # Upload coverage report as an artifact
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: coverage-report
           path: coverage
@@ -48,17 +54,21 @@ jobs:
     needs: build
 
     steps:
+      # Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
+      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '22'
 
+      # Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -66,5 +76,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ inputs.aws-region }}
 
+      # Deploy with SAM
       - name: Deploy with SAM
-        run: sam deploy --no-confirm-changeset --stack-name OpenIdConfigurationFunctionSam --capabilities CAPABILITY_IAM
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ inputs.aws-region }}
+        run: |
+          sam deploy \
+            --no-confirm-changeset \
+            --stack-name OpenIdConfigurationFunctionSam \
+            --capabilities CAPABILITY_IAM
