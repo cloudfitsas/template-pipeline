@@ -184,7 +184,7 @@ EOL
 
 cat <<EOL > "$PROJECT_NAME/package.json"
 {
-  "name": "02-message-signature",
+  "name": "03-token",
   "version": "1.0.0",
   "description": "A template for AWS Lambda functions.",
   "main": "dist/lambda/handler.js",
