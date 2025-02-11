@@ -85,6 +85,4 @@ jobs:
           AWS_REGION: ${{ inputs.aws-region }}
         run: |
           sam deploy \
-            --no-confirm-changeset \
-            --stack-name OpenIdConfigurationFunctionSam \
-            --capabilities CAPABILITY_IAM || echo "No changes to deploy"
+            --config-file samconfig.toml || echo "No changes to deploy"
