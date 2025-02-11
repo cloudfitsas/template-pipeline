@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Define the project structure
-# PROJECT_NAME="lambda-template"
-PROJECT_NAME="bancolombia-02-message-signature"
+PROJECT_NAME="bancolombia-03-token"
 DIRECTORIES=(
   "$PROJECT_NAME/.github/workflows"
   "$PROJECT_NAME/certs"
@@ -23,6 +22,7 @@ FILES=(
   "$PROJECT_NAME/tsconfig.json"
   "$PROJECT_NAME/.github/workflows/ci.yml"
   "$PROJECT_NAME/src/application/services/LambdaService.ts"
+  "$PROJECT_NAME/src/application/services/RequestBodyService.ts"
   "$PROJECT_NAME/src/domain/models/LambdaModel.ts"
   "$PROJECT_NAME/src/domain/ports/LambdaRepository.ts"
   "$PROJECT_NAME/src/infrastructure/adapters/LambdaHttpAdapter.ts"
@@ -132,9 +132,6 @@ dist
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
 
 # vuepress build output
 .vuepress/dist
@@ -187,7 +184,7 @@ EOL
 
 cat <<EOL > "$PROJECT_NAME/package.json"
 {
-  "name": "lambda-template",
+  "name": "02-message-signature",
   "version": "1.0.0",
   "description": "A template for AWS Lambda functions.",
   "main": "dist/lambda/handler.js",
@@ -204,7 +201,7 @@ cat <<EOL > "$PROJECT_NAME/package.json"
   "dependencies": {
     "aws-cdk-lib": "^2.177.0",
     "aws-lambda": "^1.0.6",
-    "axios": "^0.21.1",
+    "axios": "^0.21.4",
     "constructs": "^10.4.2",
     "node-fetch": "^2.6.1"
   },
@@ -238,6 +235,7 @@ This project is a template for creating AWS Lambda functions using TypeScript. I
 - **src/**: Contains the main application code.
   - **application/services/**: Contains service classes that implement business logic.
     - \`LambdaService.ts\`: Service for fetching lambda data.
+    - \`RequestBodyService.ts\`: Service for handling request body.
   - **domain/models/**: Contains domain models representing the data structure.
     - \`LambdaModel.ts\`: Model for lambda data.
   - **domain/ports/**: Contains interfaces defining the contracts for repositories.
@@ -362,7 +360,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '22'
+          node-version: '14'
 
       - name: Install dependencies
         run: npm install
@@ -390,7 +388,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '22'
+          node-version: '14'
 
       - name: Install dependencies
         run: npm install
@@ -409,6 +407,7 @@ EOL
 cat <<EOL > "$PROJECT_NAME/src/application/services/LambdaService.ts"
 import { LambdaModel } from '../../domain/models/LambdaModel';
 import { LambdaHttpAdapter } from '../../infrastructure/adapters/LambdaHttpAdapter';
+import * as jwt from 'jsonwebtoken';
 
 export class LambdaService {
     private readonly lambdaHttpAdapter: LambdaHttpAdapter;
@@ -417,8 +416,40 @@ export class LambdaService {
         this.lambdaHttpAdapter = new LambdaHttpAdapter();
     }
 
-    async fetchLambdaData(requestBody: any): Promise<LambdaModel> {
-        return this.lambdaHttpAdapter.getLambdaData(requestBody);
+    async fetchLambdaData(requestBody: any): Promise<string> {
+        const data: LambdaModel = await this.lambdaHttpAdapter.getLambdaData(requestBody);
+
+        const token = jwt.sign(
+            {
+                header: {
+                    alg: data.header.alg,
+                    kid: data.header.kid,
+                },
+                body: {
+                    aud: data.body.aud,
+                    exp: data.body.exp,
+                    iss: data.body.iss,
+                    sub: data.body.sub,
+                    jti: data.body.jti,
+                    iat: data.body.iat,
+                },
+            },
+            data.signingKeyPEM,
+            { algorithm: 'RS256' }
+        );
+
+        return token;
+    }
+}
+EOL
+
+cat <<EOL > "$PROJECT_NAME/src/application/services/RequestBodyService.ts"
+export class RequestBodyService {
+    static getRequestBody(eventBody: string | null, defaultBody: any): any {
+        if (eventBody) {
+            return JSON.parse(eventBody);
+        }
+        return defaultBody;
     }
 }
 EOL
@@ -514,17 +545,18 @@ EOL
 
 cat <<EOL > "$PROJECT_NAME/src/lambda/handler.ts"
 import { LambdaService } from '../application/services/LambdaService';
+import { RequestBodyService } from '../application/services/RequestBodyService';
 import { APIGatewayEvent, Context, APIGatewayProxyResult } from 'aws-lambda';
 
 const lambdaService = new LambdaService();
 
 export const main = async (event: APIGatewayEvent, context: Context): Promise<APIGatewayProxyResult> => {
     try {
-        const requestBody = JSON.parse(event.body || '{}');
+        const requestBody = RequestBodyService.getRequestBody(event.body, {});
         const data = await lambdaService.fetchLambdaData(requestBody);
         return {
             statusCode: 200,
-            body: JSON.stringify(data),
+            body: data,
             headers: {
                 'Content-Type': 'application/json',
             },
